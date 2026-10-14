@@ -31,20 +31,30 @@
     const cart = window.Sidecart;
     if (!cart || !Array.isArray(cart.cart_items)) return null;
 
-    return cart.cart_items.map((i) => ({
-      // `id` is the cart-line id; the DOM node is #sidecart_item_<id>.
-      id: i.id,
-      item_id: i.item_id,
-      item_type: i.item_type,          // 'a' album | 't' track | 'p' package | 's' subscription
-      item_title: i.item_title,
-      artist_name: i.artist_name || null,
-      url: i.url || null,
-      art_id: i.art_id || null,
-      image_id: i.image_id || null,
-      quantity: i.quantity,
-      option_name: i.option_name || null,
-      disp_price: i.disp_price || null
-    }));
+    return cart.cart_items.map((i) => {
+      // Server-rendered rows are <div class="item" id="sidecart_item_<id>">,
+      // and CartItem.init adopts them by that id. A row added without a reload
+      // takes the other branch -- CartItem.render() builds a bare
+      // <div class="item"> and nothing ever gives it an id. Stamp it here, so
+      // the content script can match the row to its data (and so show its
+      // artwork) instead of only after a refresh.
+      if (i.el && !i.el.id) i.el.id = 'sidecart_item_' + i.id;
+
+      return {
+        // `id` is the cart-line id; the DOM node is #sidecart_item_<id>.
+        id: i.id,
+        item_id: i.item_id,
+        item_type: i.item_type,        // 'a' album | 't' track | 'p' package | 's' subscription
+        item_title: i.item_title,
+        artist_name: i.artist_name || null,
+        url: i.url || null,
+        art_id: i.art_id || null,
+        image_id: i.image_id || null,
+        quantity: i.quantity,
+        option_name: i.option_name || null,
+        disp_price: i.disp_price || null
+      };
+    });
   }
 
   function publish() {

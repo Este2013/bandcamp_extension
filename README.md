@@ -29,6 +29,7 @@ On album and track pages:
 
 * The menubar cart button shows **Already in cart** when the current release is in the cart.
 * The matching cart card gets an outline and an **On this page** label.
+* Each buy option already in the cart gets a **✓ In cart** badge beside its buy button. Options are marked individually, so the vinyl can show the badge while the cassette does not.
 * Albums and their merch packages are recognised separately through their item IDs.
 
 On discography and band pages:
@@ -123,6 +124,35 @@ Bandcamp's tiles already use `position: relative` and do not define their own `:
 
 Badges also use `pointer-events: none`, so marked tiles behave exactly like unmarked tiles when clicked.
 
+### Marking buy options
+
+Bandcamp has no "add to cart" button in the page markup. One is injected only after a buy form is expanded, so the badge attaches to the control that opens that form, `h4.compound-button.main-button`, inside each `li.buyItem`.
+
+Merch options carry their package ID in the DOM as:
+
+```html
+<span id="package-title-1587956078">
+```
+
+The extension matches on that rather than the sibling button's `data-pkg`, which is only an index into `TralbumData.packages`.
+
+The digital option, `li.buyItem.digital`, is matched against the release itself.
+
+Without the page bridge, the extension can still tell whether the release is in the cart, but not which merch option, so only the digital option is marked.
+
+### Rows added without a reload
+
+`CartItem.init` has two branches:
+
+* On page load, rows are server-rendered as `<div class="item" id="sidecart_item_<id>">` and the item adopts that element by ID.
+* When an item is added without a reload, `CartItem.render()` builds a bare `<div class="item">`. Neither it nor `add_item_to_list` ever sets an ID.
+
+The extension keys cart data by `sidecart_item_<id>`, so a row added live matched nothing and appeared without artwork or a split title until the page was reloaded.
+
+`page-bridge.js` holds each `CartItem.el`, the actual node, so it stamps the missing ID during every snapshot.
+
+The content script also re-requests cart data whenever a row has no data yet, not only when the set of row IDs changes. Without that, a row that missed its stamp would stay undecorated until a reload.
+
 ## Theme colours
 
 Bandcamp's default sidebar cart uses:
@@ -180,7 +210,9 @@ Open:
 
 The harness reproduces an album page's DOM and loads Bandcamp's actual stylesheets. This allows the extension CSS to be tested against Bandcamp's existing rules.
 
-Buttons at the top simulate cart updates and item removal.
+Buttons at the top simulate cart updates and item removal. **Add item (no id, as Bandcamp does)** reproduces `CartItem.render()`, appending a row with no ID so the live-add path can be tested without a reload.
+
+Any uncaught page errors are collected into `window.__errs` for inspection.
 
 ### Test parameters
 
@@ -203,6 +235,8 @@ Three match items in the test cart:
 * A track
 
 The other two remain unmarked.
+
+It also includes a buy list with three options. The vinyl package and the digital album are in the test cart; the cassette is not.
 
 ## Notes and limitations
 

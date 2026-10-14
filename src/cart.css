@@ -467,6 +467,29 @@ body.bcx-current-in-cart .bcx-cart-btn::after {
   outline-offset: -2px;
 }
 
+/* ------------------------------------- already in cart, on the buy list --
+   ------------------------------------- of an album or track page        --
+
+   Hangs off the buy control rather than an "add to cart" button: Bandcamp has
+   no such button in the markup until a buy form is expanded. Same ::after
+   approach as the grid badge -- no injected node, no cleanup. */
+
+li.buyItem.bcx-buy-in-cart h4.compound-button.main-button::after {
+  content: "\2713\00a0In cart";
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #1da0f2;
+  color: #fff;
+  font: 700 9.5px/1.6 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 /* --------------------------------------------------------- responsive -- */
 
 @media (max-width: 900px) {

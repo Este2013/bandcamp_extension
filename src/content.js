@@ -139,6 +139,7 @@
       panel && sidecart && panel.contains(sidecart) ? 1 : 0,
       document.querySelectorAll(CART_BUTTON_SELECTOR + ':not(.bcx-cart-btn)').length,
       document.querySelectorAll('[data-item-id]').length,   // a grid loading in
+      document.querySelectorAll('li.buyItem').length,
       cartStamp
     ].join('#');
   }
@@ -157,8 +158,13 @@
       const list  = document.getElementById('item_list');
       const items = list ? Array.from(list.children).filter((el) => el.classList.contains('item')) : [];
 
+      // Re-ask the bridge when the rows change, and also whenever a row has no
+      // data yet -- a row added without a reload starts with no id, and the
+      // bridge stamps it during the next snapshot. Without the second clause a
+      // row that missed its stamp would stay undecorated until a reload.
       const domSig = items.map((el) => el.id).join('|');
-      if (domSig !== lastDomSig) {
+      const unresolved = items.some((el) => !el.id || !cartById.has(el.id));
+      if (domSig !== lastDomSig || unresolved) {
         lastDomSig = domSig;
         requestCartData();
       }
@@ -167,6 +173,7 @@
       buildHeader(items.length);
       updateCartButtons(items);
       markGrid();
+      markBuyOptions();
 
       const panel = document.getElementById(PANEL_ID);
       if (panel) panel.classList.toggle('bcx-has-items', items.length > 0);
@@ -540,6 +547,50 @@
 
   const GRID_PREFIX = { a: 'album', t: 'track' };
   const GRID_ID = /^(album|track)-\d+$/;
+
+  // Flags the buy options on an album or track page that are already in the
+  // cart. There is no "add to cart" button in the markup -- Bandcamp injects
+  // one only once you expand a buy form -- so the badge hangs off the buy
+  // control that opens it, h4.compound-button.main-button.
+  //
+  // Merch options carry their package id in the DOM as
+  // <span id="package-title-<id>">, which beats the sibling button's data-pkg
+  // (an index into TralbumData.packages) for reliability.
+  function markBuyOptions() {
+    const options = document.querySelectorAll('li.buyItem');
+    if (!options.length) return;
+
+    const current = currentPageItem();
+    const packageIds = new Set();
+    let releaseInCart = false;
+
+    if (current) {
+      for (const data of cartById.values()) {
+        if (data.item_type === 'p' && data.item_id) packageIds.add(data.item_id);
+        if ((data.item_type === 'a' && current.type === 'album' && data.item_id === current.id) ||
+            (data.item_type === 't' && current.type === 'track' && data.item_id === current.id)) {
+          releaseInCart = true;
+        }
+      }
+
+      // Without the bridge we can still tell whether this release is in the
+      // cart, just not which merch option is.
+      if (!cartById.size) {
+        releaseInCart = Array.from(document.querySelectorAll('#item_list a.itemName[href]'))
+          .some((link) => normalizeUrl(link.href) === current.url);
+      }
+    }
+
+    for (const option of options) {
+      const title = option.querySelector('[id^="package-title-"]');
+      const inCart = title
+        ? packageIds.has(Number(title.id.slice(PACKAGE_TITLE_PREFIX.length)))
+        : option.classList.contains('digital') && releaseInCart;
+      option.classList.toggle('bcx-buy-in-cart', !!inCart);
+    }
+  }
+
+  const PACKAGE_TITLE_PREFIX = 'package-title-';
 
   function updateCartButtons(items) {
     const panel  = document.getElementById(PANEL_ID);

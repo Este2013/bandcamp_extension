@@ -15,6 +15,7 @@
 <head>
   <meta charset="utf-8">
   <title>Cart relocator harness</title>
+  <script>window.__errs=[];addEventListener('error',function(e){__errs.push({msg:e.message,src:e.filename,line:e.lineno,col:e.colno});},true);</script>
   <link rel="stylesheet" href="https://s4.bcbits.com/client-bundle/1/trackpipe/global-638081672151ff9aa8b6211fcc642b4a.css">
   <link rel="stylesheet" href="https://s4.bcbits.com/client-bundle/1/trackpipe/tralbum-3e96cd08d8541c974d25575232a4b24a.css">
   <link rel="stylesheet" href="../src/cart.css">
@@ -40,6 +41,10 @@
     #music-grid .art { display: block; position: relative; width: 168px; height: 168px; }
     #music-grid .art img { width: 100%; height: 100%; object-fit: cover; display: block; }
     #music-grid .title { margin: 4px 0 0; font-size: 12px; }
+    .buyItemPackageTitles { list-style: none; margin: 20px 0; padding: 0; }
+    li.buyItem { margin: 0 0 18px; padding: 10px; border: 1px solid rgba(128,128,128,.35); }
+    li.buyItem h3.hd { margin: 0 0 6px; font-size: 14px; }
+    li.buyItem h4.compound-button { margin: 8px 0 0; font-size: 13px; }
     #harness-bar { position: sticky; top: 0; z-index: 50; background: #111; color: #fff;
                    padding: 8px 14px; display: flex; gap: 10px; align-items: center; font: 13px sans-serif; }
     #harness-bar button { font: inherit; padding: 4px 10px; }
@@ -54,6 +59,7 @@
   </button>
   <button type="button" onclick="Sidecart.wiggle()">simulate add-to-cart wiggle</button>
   <button type="button" onclick="harnessRemoveFirst()">remove first item</button>
+  <button type="button" onclick="harnessAddLikeBandcamp()">add item (no id, as Bandcamp does)</button>
 </div>
 
 <div id="centerWrapper">
@@ -115,6 +121,61 @@
       <h2>Vive</h2>
       <p>by Hainbach</p>
       <div class="fake-art"></div>
+
+      <!-- Real buy-list markup. Package ids live in the span id, which is what
+           the extension matches on; data-pkg is only an index. Package
+           1587956078 is in the fixture cart (as a merch line), 2944566678 is
+           not, and the digital album is. -->
+      <ul class="buyItemPackageTitles">
+        <li class="buyItem package">
+          <h3 class="hd">
+            <span id="package-title-1587956078">
+              <button class="order_package_link buy-link" type="button" data-pkg="0">
+                <span class="buyItemPackageTitle primaryText">Limited Edition Vinyl LP</span>
+              </button>
+            </span>
+            <div class="merchtype secondaryText">Record/Vinyl + Digital Album</div>
+          </h3>
+          <div class="ft">
+            <h4 class="compound-button main-button">
+              <button class="order_package_link buy-link" type="button" data-pkg="0">Buy Vinyl</button>&nbsp;
+              <span class="nobreak"><span class="base-text-color">€25</span>
+              <span class="buyItemExtra secondaryText">EUR</span></span>
+            </h4>
+          </div>
+        </li>
+        <li class="buyItem package">
+          <h3 class="hd">
+            <span id="package-title-2944566678">
+              <button class="order_package_link buy-link" type="button" data-pkg="1">
+                <span class="buyItemPackageTitle primaryText">Limited Edition Cassette</span>
+              </button>
+            </span>
+            <div class="merchtype secondaryText">Cassette + Digital Album</div>
+          </h3>
+          <div class="ft">
+            <h4 class="compound-button main-button">
+              <button class="order_package_link buy-link" type="button" data-pkg="1">Buy Cassette</button>&nbsp;
+              <span class="nobreak"><span class="base-text-color">€11</span>
+              <span class="buyItemExtra secondaryText">EUR</span></span>
+            </h4>
+          </div>
+        </li>
+        <li class="buyItem digital">
+          <h3 class="hd">
+            <button class="download-link buy-link" type="button">
+              <span class="buyItemPackageTitle primaryText">Digital Album</span>
+            </button>
+            <div class="digitaldescription secondaryText">Streaming + Download</div>
+          </h3>
+          <div class="ft">
+            <h4 class="ft compound-button main-button">
+              <button class="download-link buy-link" type="button">Buy Digital Album</button>&nbsp;
+              <span class="buyItemExtra buyItemNyp secondaryText">name your price</span>
+            </h4>
+          </div>
+        </li>
+      </ul>
       <p style="height:600px">(page body, to give the page some scroll)</p>
 
       <!-- Real #music-grid markup, copied from epicmountainmusic.bandcamp.com.
@@ -255,7 +316,34 @@ function harnessRender() {
       '    </p>\n' +
       '</div>\n</div>';
     list.appendChild(el);
+    i.el = el;
   }
+}
+
+/* Reproduces Sidecart.add_item_to_list for an item added without a reload:
+   CartItem.render() builds a bare <div class="item"> with NO id, keeps the node
+   on the CartItem as .el, pushes it, appends it and calls update_item_list. */
+function harnessAddLikeBandcamp() {
+  const item = {
+    id: 777, item_id: 1932088768, item_type: 'a', item_title: 'Added Without Reloading',
+    artist_name: 'KNYST', url: 'https://knyst.bandcamp.com/album/imaginary-timbral-objects',
+    art_id: 1932088768, quantity: 1, option_name: null, disp_price: '$9'
+  };
+  const el = document.createElement('div');
+  el.className = 'item';                       // note: no id, exactly as Bandcamp leaves it
+  el.innerHTML = [
+    '<div class="cartItemReveal reveal"><div class="cartItemContents"><p>',
+    '<a class="itemName notSkinnable" href="' + item.url + '">',
+    item.artist_name + ', ' + item.item_title + ', digital album</a>',
+    '<br>',
+    '<a class="delete notSkinnable" href="#"><span>x</span></a>',
+    '<span class="price">' + item.disp_price + '</span>',
+    '</p></div></div>'
+  ].join('');
+  item.el = el;
+  Sidecart.cart_items.push(item);
+  document.getElementById('item_list').appendChild(el);
+  Sidecart.update_item_list();
 }
 
 function harnessRemoveFirst() {
