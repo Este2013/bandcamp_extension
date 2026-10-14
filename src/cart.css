@@ -1,0 +1,491 @@
+/* ==========================================================================
+   Bandcamp Cart Relocator
+   Injected at document_start, so the cart never flashes in the sidebar.
+   ========================================================================== */
+
+/* Hide the cart until content.js has moved it. The class is always removed,
+   with a timeout as a backstop, so a failure can't leave the cart invisible. */
+html.bcx-pending #sidecart { visibility: hidden !important; }
+
+/* --------------------------------------------------------------- panel -- */
+
+#bcx-cart-panel {
+  /* --bcx-surface and --bcx-text are set at runtime from #pgBd, so the panel
+     matches themed artist pages. Everything else is derived from them: mixing
+     toward the surface keeps dimmed text at a predictable contrast, which
+     plain opacity does not on a dark theme. */
+  --bcx-page-width: 975px;
+  --bcx-surface: #fff;
+  --bcx-text: #222;
+  --bcx-muted: color-mix(in srgb, var(--bcx-text) 80%, var(--bcx-surface));
+  --bcx-faint: color-mix(in srgb, var(--bcx-text) 74%, var(--bcx-surface));
+  --bcx-line:  color-mix(in srgb, var(--bcx-text) 22%, var(--bcx-surface));
+  --bcx-tint:  color-mix(in srgb, var(--bcx-text)  7%, var(--bcx-surface));
+  --bcx-accent: #1da0f2;
+
+  box-sizing: border-box;
+  width: var(--bcx-page-width);
+  max-width: 100%;
+  margin: 26px auto 10px;
+  padding: 16px 20px 18px;
+
+  background: var(--bcx-surface);
+  color: var(--bcx-text);
+  border: 1px solid var(--bcx-line);
+  border-radius: 12px;
+
+  font: 400 13px/1.45 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  scroll-margin-top: 92px;   /* clears the sticky menubar when scrolled to */
+}
+
+#bcx-cart-panel:not(.bcx-has-items) { display: none; }
+
+#bcx-cart-panel * { box-sizing: border-box; }
+
+/* Flatten the sidebar wrappers Bandcamp nests the cart in. */
+#bcx-cart-panel #sidecart,
+#bcx-cart-panel #sidecartReveal,
+#bcx-cart-panel #sidecartBody,
+#bcx-cart-panel #sidecart-phone-reveal,
+#bcx-cart-panel #sidecartContents {
+  display: block !important;
+  position: static !important;
+  float: none !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: auto !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  overflow: visible !important;
+  opacity: 1 !important;
+}
+
+/* Bandcamp paints the sidecart #333 on its own light-grey panel and the whole
+   subtree inherits that. Relocated onto a themed page it becomes dark-on-dark
+   (rigeltheatre.bandcamp.com is #333 on #2B2F36), so re-anchor the subtree to
+   the page's own text colour. Individual rules below still override this. */
+#bcx-cart-panel #sidecart { color: var(--bcx-text) !important; }
+
+/* Links Bandcamp hard-codes to its blue, which no themed background is
+   guaranteed to carry. Underlined instead, so they still read as links. */
+#bcx-cart-panel #sidecart .country-picker {
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* The one deliberate exception: the button has its own fill (the artist can
+   theme it), and its label stays pure white regardless of the page. */
+#bcx-cart-panel #sidecartCheckout,
+#bcx-cart-panel #sidecartCheckout * {
+  color: #fff !important;
+}
+
+/* The point of the exercise: no more shaking. */
+#bcx-cart-panel #sidecart.wiggle {
+  animation: none !important;
+  transform: none !important;
+}
+
+/* -------------------------------------------------------------- header --
+   Title + totals on the left, Check out + the tax note on the right. The
+   whole recap lives up here so the cards below get the full panel width. */
+
+#bcx-cart-panel #sidecartHeader {
+  display: flex !important;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 0 0 16px !important;
+  padding: 0 0 12px !important;
+  border-bottom: 1px solid var(--bcx-line) !important;
+}
+
+#bcx-cart-panel .bcx-head-left {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#bcx-cart-panel .bcx-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+#bcx-cart-panel #sidecartHeader h3.title {
+  margin: 0;
+  padding: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: inherit;
+  background: none !important;   /* kills the sprite icon */
+  text-indent: 0;
+}
+
+#bcx-cart-panel .bcx-count {
+  font-size: 11.5px;
+  letter-spacing: 0.3px;
+  color: var(--bcx-faint);
+}
+
+#bcx-cart-panel .bcx-head-right {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 176px;
+}
+
+#bcx-cart-panel .bcx-tax {
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: center;
+  color: var(--bcx-faint);
+}
+
+/* --------------------------------------------------- totals, as a sub- --
+   --------------------------------------------------- title under the   --
+   --------------------------------------------------- cart title        --
+   subtotal / additional contribution / "ship to ..." read as one line. */
+
+#bcx-cart-panel #sidecartSummary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 18px;
+  margin: 6px 0 0 !important;
+  padding: 0 !important;
+}
+
+#bcx-cart-panel #summary {
+  display: block;
+  width: auto;
+  margin: 0;
+  border: 0;
+  border-collapse: collapse;
+}
+
+#bcx-cart-panel #summary > tbody {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 18px;
+}
+
+#bcx-cart-panel #summary tr {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+#bcx-cart-panel #summary th,
+#bcx-cart-panel #summary td {
+  display: block;
+  padding: 0 !important;
+  border: 0 !important;
+  font-size: 12.5px;
+  font-weight: 400;
+  text-align: left;
+  white-space: nowrap;
+}
+
+#bcx-cart-panel #summary th { color: var(--bcx-muted); }
+#bcx-cart-panel #summary td.numeric { font-weight: 600; color: var(--bcx-text); }
+#bcx-cart-panel #summary td.currency { color: var(--bcx-muted); }
+
+/* The tax note is mirrored into .bcx-tax under the Check out button. */
+#bcx-cart-panel #summary tr:has(> .sidecartTaxText) { display: none; }
+#bcx-cart-panel #summary .sidecartTaxText { display: none; }
+
+#bcx-cart-panel .summary-notes {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--bcx-muted);
+}
+
+/* -------------------------------------------------------------- items -- */
+
+#bcx-cart-panel #sidecart-phone-reveal { display: block !important; }
+
+/* Emptied once the summary and the button move into the header. Kept in the
+   tree (not display:none'd outright) in case checkout renders into it. */
+#bcx-cart-panel #sidecartFooter {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+}
+
+#bcx-cart-panel #sidecartFooter.bcx-empty { display: none !important; }
+
+#bcx-cart-panel #item_list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* --------------------------------------------------------------- card -- */
+
+#bcx-cart-panel #item_list > .item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 164px;
+  margin: 0 !important;
+  padding: 0 !important;
+  float: none !important;
+  overflow: hidden;
+  background: var(--bcx-tint);
+  border: 1px solid var(--bcx-line);
+  border-radius: 10px;
+}
+
+#bcx-cart-panel .bcx-art {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--bcx-tint);
+  border-bottom: 1px solid var(--bcx-line);
+}
+
+#bcx-cart-panel .bcx-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* jQuery slideDown/slideUp leaves inline height + opacity on this wrapper. */
+#bcx-cart-panel .cartItemReveal {
+  display: block !important;
+  height: auto !important;
+  opacity: 1 !important;
+  overflow: visible !important;
+}
+
+#bcx-cart-panel .cartItemContents {
+  padding: 9px 10px 10px;
+  margin: 0;
+}
+
+#bcx-cart-panel .cartItemContents p {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  line-height: 1.35;
+}
+
+#bcx-cart-panel .cartItemContents br { display: none; }
+
+#bcx-cart-panel #sidecart a.itemName {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-decoration: none;
+  color: var(--bcx-text);
+}
+
+#bcx-cart-panel #sidecart a.itemName:hover { text-decoration: underline; }
+
+#bcx-cart-panel .bcx-artist {
+  font-size: 11.5px;
+  color: var(--bcx-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#bcx-cart-panel .bcx-format {
+  margin-top: 1px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--bcx-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#bcx-cart-panel .bcx-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 7px;
+}
+
+#bcx-cart-panel #sidecart span.price {
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--bcx-text);
+}
+
+#bcx-cart-panel #sidecart a.delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  border: 1px solid var(--bcx-line);
+  color: var(--bcx-faint);
+  text-decoration: none;
+  font-size: 11px;
+  line-height: 1;
+}
+
+#bcx-cart-panel #sidecart a.delete:hover {
+  color: #fff;
+  background: #d0021b;
+  border-color: #d0021b;
+}
+
+/* ---------------------------------------- the item on the current page -- */
+
+#bcx-cart-panel #item_list > .item.bcx-current {
+  border-color: var(--bcx-accent);
+  box-shadow: inset 0 0 0 1px var(--bcx-accent);
+}
+
+#bcx-cart-panel #item_list > .item.bcx-current::before {
+  content: "On this page";
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--bcx-accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  line-height: 1.5;
+}
+
+/* ----------------------------------------------------------- checkout -- */
+
+#bcx-cart-panel #sidecartCheckout {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 9px 22px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------- highlight on jump -- */
+
+#bcx-cart-panel.bcx-flash {
+  outline: 3px solid var(--bcx-accent);
+  outline-offset: 4px;
+  animation: bcx-flash 1.9s ease-in-out 1;
+}
+
+@keyframes bcx-flash {
+  0%          { box-shadow: 0 0 0 0 rgba(29, 160, 242, 0); }
+  12%, 72%    { box-shadow: 0 0 0 6px rgba(29, 160, 242, 0.45); }
+  100%        { box-shadow: 0 0 0 0 rgba(29, 160, 242, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #bcx-cart-panel.bcx-flash { animation: none; }
+}
+
+/* ------------------------------------------- "Already in cart" on the  --
+   ------------------------------------------- menubar cart button       -- */
+
+.bcx-cart-btn { cursor: pointer; }
+
+body.bcx-current-in-cart .bcx-cart-btn::after {
+  content: "Already in cart";
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 7px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bcx-accent, #1da0f2);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* -------------------------------------- already in cart, in a release --
+   -------------------------------------- grid (discography / band page) --
+
+   Grid tiles are already position:relative and define no ::after, so the badge
+   needs no injected element -- nothing for Bandcamp's Knockout bindings to
+   clobber, and nothing to clean up. Colours are literal rather than the panel
+   variables: these tiles sit on the page, not on the panel surface. */
+
+[data-item-id].bcx-grid-in-cart {
+  position: relative;   /* no-op where Bandcamp already sets it */
+}
+
+[data-item-id].bcx-grid-in-cart::after {
+  content: "In cart";
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #1da0f2;
+  color: #fff;
+  font: 700 9.5px/1.5 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;   /* never swallow a click meant for the tile */
+}
+
+[data-item-id].bcx-grid-in-cart .art {
+  outline: 2px solid #1da0f2;
+  outline-offset: -2px;
+}
+
+/* --------------------------------------------------------- responsive -- */
+
+@media (max-width: 900px) {
+  #bcx-cart-panel {
+    width: auto;
+    margin-left: 12px;
+    margin-right: 12px;
+    padding: 14px;
+  }
+
+  #bcx-cart-panel #sidecartHeader {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  #bcx-cart-panel .bcx-head-right {
+    width: 100%;
+    min-width: 0;
+  }
+
+  #bcx-cart-panel #item_list > .item { width: calc(50% - 7px); }
+}

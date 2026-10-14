@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Bandcamp Cart Relocator",
+  "version": "1.0.0",
+  "description": "Moves the Bandcamp shopping cart out of the sidebar to just above the \"you may also like\" footer, as a wrapping row of cards. The menubar cart button scrolls + highlights instead of wiggling, and shows an \"Already in cart\" state.",
+  "content_scripts": [
+    {
+      "matches": ["*://*.bandcamp.com/*"],
+      "css": ["src/cart.css"],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": ["*://*.bandcamp.com/*"],
+      "js": ["src/page-bridge.js"],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": ["*://*.bandcamp.com/*"],
+      "js": ["src/content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
+}
