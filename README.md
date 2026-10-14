@@ -1,166 +1,245 @@
 # Bandcamp Cart Relocator
 
-Moves Bandcamp's shopping cart out of the right sidebar (where it pushes the
-artist photo and everything else down) to a panel just above the
-"… recommends:" footer, laid out as a wrapping row of cards.
+Chrome extension that moves Bandcamp's shopping cart from the right sidebar to the bottom of the main page, just above the recommendations footer.
 
-## What it does
+The default cart pushes the artist photo and other sidebar content down as items are added. This extension gives the cart its own full-width panel, with items arranged as cards rather than a vertical list.
 
-- **Relocates the cart.** `#sidecart` is moved — node and all, so Bandcamp's own
-  delete/checkout handlers keep working — into a panel inserted immediately
-  after the page body, which on album and track pages puts it right above the
-  `#pgFt` recommendations footer. Discography and band pages have no `#pgFt`,
-  so there the panel lands between the release grid and the site footer.
-- **Cards instead of a list.** `#item_list` becomes a wrapping flex row across
-  the full panel width. Each item gets its cover art, the title and artist on
-  separate lines, the format ("Digital album", "Limited Edition Vinyl LP · ×2"),
-  and a price/remove row.
-- **The recap lives in the header.** Subtotal, additional contribution and
-  "ship to …" read as a subtitle under the *Shopping cart* title. *Check out*
-  sits on the title line at the far right, with "taxes calculated at checkout"
-  directly beneath it. Nothing sits beside the cards, so they get the whole
-  width — five per row at Bandcamp's 975px instead of four.
-- **No more wiggle.** Clicking the menubar cart button used to scroll the page
-  to the top and shake the sidebar. It now smooth-scrolls to the relocated cart
-  and highlights it for ~2 seconds. Adding something to the cart does the same.
-- **"Already in cart".** When something from the page you are looking at is in
-  the cart, the menubar cart button gets an *Already in cart* badge and the
-  matching card is outlined and tagged *On this page*. This matches by item id,
-  so an album *and* any of its merch packages are both recognised. Discography
-  pages show no single item, so they get no badge — see below.
-- **Release grids are flagged too.** On a discography or band page, every tile
-  already in the cart gets an *In cart* pill and an outlined cover.
+## Features
 
-Themed artist pages are respected — the panel borrows its width, background and
-text colour from `#pgBd` at runtime rather than forcing a white box onto a dark
-layout. See [Colour on themed pages](#colour-on-themed-pages).
+### Cart layout
 
-## Install (unpacked, dev mode)
+* **Relocated cart:** Moves `#sidecart` below the main page content. On album and track pages, it appears above the "… recommends:" footer. On discography and band pages, it appears below the release grid.
+* **Card layout:** Cart items appear in a wrapping row, with cover art, title, artist, format, quantity, price, and remove button.
+* **Full-width cards:** At Bandcamp's standard 975px width, five cards fit per row.
+* **Compact header:** Subtotal, additional contribution, and shipping destination appear below the *Shopping cart* heading. The checkout button sits at the top right, with the tax note beneath it.
 
-1. Go to `chrome://extensions`.
-2. Turn on **Developer mode** (top right).
-3. **Load unpacked** → select this folder.
+The extension moves Bandcamp's existing cart elements rather than rebuilding them. Remove buttons, checkout, and the shipping country selector continue using Bandcamp's own handlers.
 
-No build step, no permissions, no background worker. Reload the extension from
-that page after editing any file.
+### Cart navigation
+
+Clicking the menubar cart button normally scrolls to the top and shakes the sidebar cart.
+
+The extension replaces this with a smooth scroll to the relocated cart and a brief highlight lasting about two seconds.
+
+The same happens when an item is added to the cart.
+
+### Items already in the cart
+
+On album and track pages:
+
+* The menubar cart button shows **Already in cart** when the current release is in the cart.
+* The matching cart card gets an outline and an **On this page** label.
+* Albums and their merch packages are recognised separately through their item IDs.
+
+On discography and band pages:
+
+* Release tiles already represented in the cart get an **In cart** badge and an outlined cover.
+* Merch packages also mark their associated album tile.
+* The menubar button does not show **Already in cart**, since these pages display multiple releases rather than one item.
+
+### Artist themes
+
+The cart uses the artist page's background and text colours instead of imposing a fixed light theme.
+
+Text contrast is checked at runtime. If the theme colours would make the cart unreadable, the extension adjusts them or gives the cart its own background.
+
+See [Theme colours](#theme-colours) for details.
+
+## Installation
+
+1. Open `chrome://extensions`.
+2. Enable **Developer mode** in the top-right corner.
+3. Click **Load unpacked** and select the extension folder.
+
+After changing any extension file, reload the extension from `chrome://extensions`.
+
+Requires Chrome 111 or newer.
 
 ## Files
 
-| File | Role |
-| --- | --- |
-| `manifest.json` | MV3 manifest; three content scripts, no permissions |
-| `src/cart.css` | Injected at `document_start`, so the cart never flashes in the sidebar |
-| `src/content.js` | Isolated world: moves the cart, builds the cards, hijacks the button |
-| `src/page-bridge.js` | Main world: reads `window.Sidecart`, replaces `Sidecart.wiggle()` |
-| `test/harness.html` | Offline stand-in for an album page (not loaded by the extension) |
+| File                 | Purpose                                                                                        |
+| -------------------- | ---------------------------------------------------------------------------------------------- |
+| `manifest.json`      | Manifest V3 configuration. Three content scripts, no permissions.                              |
+| `src/cart.css`       | Cart styling, injected at `document_start` to prevent the original sidebar cart from flashing. |
+| `src/content.js`     | Moves the cart, arranges its contents, and handles cart navigation.                            |
+| `src/page-bridge.js` | Reads Bandcamp's cart data and overrides `Sidecart.wiggle()`.                                  |
+| `test/harness.html`  | Offline album-page test harness. Not loaded by the extension.                                  |
 
-### Why two scripts
+## Implementation
 
-A content script can't see the page's own JavaScript. The cart DOM has no
-artwork and mashes everything into one string
-(`"Hainbach, Vive, digital album"`), but `window.Sidecart.cart_items[]` has
-`art_id`, `artist_name`, `item_id` and `item_type` as separate fields. So
-`page-bridge.js` runs in the page's world (`"world": "MAIN"`) and passes a JSON
-snapshot across with `CustomEvent`. It also replaces `Sidecart.wiggle()`, which
-is what Bandcamp calls both from the menubar button and after an add-to-cart.
+### Accessing Bandcamp's cart data
 
-If the bridge ever fails to find `Sidecart`, the extension degrades: the cart is
-still relocated and still laid out as cards, just without artwork and with
-Bandcamp's original one-line labels, and "already in cart" falls back to
-comparing item URLs.
+Bandcamp's cart DOM does not contain artwork IDs or structured item details. Item labels also combine several fields into one string, such as:
 
-## Page layouts
+`"Hainbach, Vive, digital album"`
 
-Album and track pages end with `#pgFt`, the "… recommends:" footer. Discography
-and band pages (`artist.bandcamp.com`, `/music`) have no such footer at all, so
-anchoring only to `#pgFt` left the cart in the sidebar there. Since `#pgFt`
-always sits immediately after `#pgBd` anyway, the panel is placed *after the
-page body* instead, which covers both layouts with one rule.
+The page's `window.Sidecart.cart_items[]` contains the individual fields:
 
-Discography pages also carry a `script[data-tralbum]`, but a stub one — no
-`id`, no `item_type`, just the `/music` URL. The "already in cart" check
-therefore requires those fields rather than trusting the blob's presence;
-otherwise the cart button could claim *Already in cart* on a page that shows no
-single item.
+* `art_id`
+* `artist_name`
+* `item_id`
+* `item_type`
+
+Chrome content scripts run in an isolated JavaScript environment, so `content.js` cannot access `window.Sidecart` directly.
+
+`page-bridge.js` runs in the page's main world using `"world": "MAIN"`. It reads the cart data and sends a JSON snapshot to `content.js` through a `CustomEvent`.
+
+The bridge also replaces `Sidecart.wiggle()`, which Bandcamp calls when the cart button is clicked or an item is added.
+
+**If the bridge fails:** The cart still moves and uses the card layout. Artwork and structured item labels are unavailable, so the extension falls back to Bandcamp's original labels. Cart matching falls back to item URLs.
+
+### Cart placement
+
+Album and track pages have a `#pgFt` recommendations footer immediately after `#pgBd`.
+
+Discography and band pages, including `artist.bandcamp.com` and `/music`, do not have `#pgFt`.
+
+The extension therefore inserts the cart panel after the page body rather than anchoring it to `#pgFt`.
+
+This places the cart correctly on both layouts without separate positioning rules.
+
+### Detecting the current release
+
+Album and track pages expose release information through `script[data-tralbum]`.
+
+Discography pages also have this script, but it contains only a stub with the `/music` URL. It has no release `id` or `item_type`.
+
+The **Already in cart** check requires both fields. This prevents the menubar badge from appearing on discography pages.
 
 ### Marking release grids
 
-Grid tiles carry `data-item-id="album-<id>"` or `"track-<id>"`, which lines up
-directly with the cart's `item_type` + `item_id`. Merch packages carry a
-*package* id instead, so those fall back to matching the release URL — having
-the vinyl in your cart marks the album's tile, which is the useful behaviour.
+Release tiles use IDs in these formats:
 
-The badge is a `::after` on the tile rather than an injected element. Tiles are
-already `position: relative` and define no `::after`, so there is nothing for
-Bandcamp's Knockout bindings to clobber and nothing to clean up. It carries
-`pointer-events: none`; marked and unmarked tiles hit-test identically.
+* `data-item-id="album-<id>"`
+* `data-item-id="track-<id>"`
 
-## Colour on themed pages
+These correspond directly to the cart's `item_type` and `item_id`.
 
-Bandcamp styles the sidecart as `#sidecart { color: #333; background: #e6e6e6 }`
-and the entire cart subtree inherits that `#333`. That is fine inside its own
-light-grey sidebar panel, but once the cart is relocated onto a themed page the
-grey background goes and the dark text stays. On
-`rigeltheatre.bandcamp.com`, whose theme is `#pgBd { background: #2B2F36 }`,
-that left `#333` on `#2B2F36` — a contrast ratio of **1.06:1**, i.e. invisible.
+Merch packages use a separate `package` ID, so the extension matches those by release URL instead. For example, adding an album's vinyl edition marks that album's tile as **In cart**.
 
-So the extension re-anchors the whole subtree to `#pgBd`'s own `color`, which is
-exactly what artist themes set and what the track list, titles and about text
-all inherit — it is the main section's text colour by definition. Dimmed text
-(the format line, the tax note, the item count) is mixed *toward the surface*
-with `color-mix` rather than dimmed with `opacity`, because a fixed opacity has
-no predictable contrast on a dark background.
+The badge uses a CSS `::after` pseudo-element rather than an injected DOM node.
 
-Two deliberate exceptions:
+Bandcamp's tiles already use `position: relative` and do not define their own `::after`. This avoids interfering with Knockout bindings and requires no additional cleanup.
 
-- **The Check out button keeps pure white text** regardless of the page. It has
-  its own fill, which artists can theme (green on Rigel Theatre), and Bandcamp
-  already labels it white.
-- **If a theme pairs a text colour with a background it is unreadable against**,
-  the extension drops to plain black or white. If even that falls short — a
-  mid-grey background reads poorly against both — the panel takes its own
-  surface instead of matching the page.
+Badges also use `pointer-events: none`, so marked tiles behave exactly like unmarked tiles when clicked.
 
-Measured worst-case contrast over every text element in the cart: **10:1** on a
-default page, **5.45:1** on the Rigel Theatre theme, **8.21:1** on a
-deliberately unreadable one. WCAG AA for body text is 4.5:1.
+## Theme colours
+
+Bandcamp's default sidebar cart uses:
+
+```css
+#sidecart {
+  color: #333;
+  background: #e6e6e6;
+}
+```
+
+Moving the cart onto an artist page removes the original grey background, but the dark text colour remains.
+
+On `rigeltheatre.bandcamp.com`, for example, the main page background is `#2B2F36`. The inherited `#333` cart text has a contrast ratio of just **1.06:1**, making it nearly invisible.
+
+The extension fixes this by using the computed text colour from `#pgBd`, which also controls the main page's track list, titles, and other text.
+
+Secondary text, such as format labels, item counts, and tax notes, uses `color-mix` to blend toward the background. This gives more predictable contrast than applying a fixed opacity.
+
+Two exceptions apply:
+
+**Checkout button**
+
+The button keeps white text because it has its own background colour, which artists can customise.
+
+**Unreadable artist themes**
+
+If the artist's text colour has insufficient contrast against the background, the extension switches to black or white.
+
+If neither provides enough contrast, the cart gets its own background instead of matching the page.
+
+### Measured contrast
+
+Lowest measured text contrast across cart elements:
+
+| Theme                              | Minimum contrast |
+| ---------------------------------- | ---------------: |
+| Default Bandcamp                   |             10:1 |
+| Rigel Theatre                      |           5.45:1 |
+| Deliberately unreadable test theme |           8.21:1 |
+
+WCAG AA requires at least **4.5:1** for normal body text.
 
 ## Testing
+
+Start a local server from the project folder:
 
 ```bash
 python -m http.server 8787
 ```
 
-Then open <http://127.0.0.1:8787/test/harness.html>. The harness reproduces the
-real album-page DOM and pulls in Bandcamp's actual stylesheets, so the extension
-CSS is exercised against the rules it has to override. Buttons at the top
-simulate an add-to-cart wiggle and item removal.
+Open:
 
-Add `?theme=dark` to reproduce the Rigel Theatre colours, or `?theme=awful` for
-a background that is unreadable against both black and white. Add
-`?layout=disco` to drop `#pgFt` and swap in the stub tralbum blob, reproducing
-a discography page. The parameters combine, e.g.
-`?layout=disco&theme=dark`.
+`http://127.0.0.1:8787/test/harness.html`
 
-The harness also carries a real `#music-grid`: three of its five tiles match
-the fixture cart (an album, a release whose *merch package* is in the cart, and
-a track), two do not.
+The harness reproduces an album page's DOM and loads Bandcamp's actual stylesheets. This allows the extension CSS to be tested against Bandcamp's existing rules.
 
-## Notes and limits
+Buttons at the top simulate cart updates and item removal.
 
-- Matches `*://*.bandcamp.com/*` only. Artists on custom domains serve the same
-  pages from their own hostname — add it to `content_scripts[].matches` in
-  `manifest.json` if you buy from one.
-- Needs Chrome 111+ for `"world": "MAIN"` content scripts.
-- Bandcamp ships two menubars (an older Knockout one and a newer Vue one). The
-  button is matched by `aria-label="Cart"` plus a few fallbacks, which covers
-  both; modifier-clicks (ctrl/cmd/shift) are deliberately left alone so
-  open-in-new-tab still works.
-- Pages with neither `#pgFt` nor `#pgBd` are left untouched — the cart stays in
-  the sidebar and the button keeps its stock behaviour.
-- `#sidecartSummary` and the *Check out* button are **moved** into the header,
-  not rebuilt, so the country picker and the checkout handler keep working.
-  Bandcamp replaces that summary's `innerHTML` on every cart update but keeps
-  the element, so the move survives. The "taxes calculated at checkout" line is
-  the exception: it lives inside that re-rendered HTML, so its text is mirrored
-  into a separate node under the button and the original row is hidden.
+### Test parameters
+
+| Parameter       | Result                                                                         |
+| --------------- | ------------------------------------------------------------------------------ |
+| `?theme=dark`   | Uses the Rigel Theatre colours.                                                |
+| `?theme=awful`  | Tests a background with poor contrast against both black and white.            |
+| `?layout=disco` | Removes `#pgFt` and uses a stub tralbum object to simulate a discography page. |
+
+Parameters can be combined:
+
+`?layout=disco&theme=dark`
+
+The harness also includes a `#music-grid` with five release tiles.
+
+Three match items in the test cart:
+
+* An album
+* An album with a merch package in the cart
+* A track
+
+The other two remain unmarked.
+
+## Notes and limitations
+
+### Supported domains
+
+The extension matches:
+
+`*://*.bandcamp.com/*`
+
+Artist pages hosted on custom domains are not included.
+
+To support a custom domain, add it to `content_scripts[].matches` in `manifest.json`.
+
+### Chrome version
+
+Chrome 111 or newer is required for content scripts using `"world": "MAIN"`.
+
+### Menubar compatibility
+
+Bandcamp uses two menubar implementations: an older Knockout version and a newer Vue version.
+
+The extension identifies the cart button through `aria-label="Cart"` and several fallback selectors.
+
+Ctrl, Cmd, and Shift clicks retain their original behaviour, including opening the cart in a new tab.
+
+### Unsupported page layouts
+
+Pages without `#pgFt` or `#pgBd` are left unchanged.
+
+The cart stays in the sidebar, and the menubar button keeps its original behaviour.
+
+### Cart summary updates
+
+The extension moves the existing `#sidecartSummary` and **Check out** button into the new header.
+
+It does not recreate them, so Bandcamp's country selector and checkout handler continue working.
+
+Bandcamp replaces the summary's `innerHTML` after cart updates but preserves the summary element itself. The relocated summary therefore survives these updates.
+
+The tax note needs separate handling. Since Bandcamp recreates that line during updates, the extension copies its text into a separate element below the checkout button and hides the original row.
